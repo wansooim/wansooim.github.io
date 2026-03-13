@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>SVI AutoGenerator — Davidson County, TN</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+  html, body { height:100%; margin:0; }
+  body { display:flex; flex-direction:column; background:#f3f4f6; font:12px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+  .toolbar{ position:sticky; top:0; z-index:100; box-sizing:border-box; display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:10px 12px; background:#fff; border-bottom:1px solid #e5e7eb; }
+  .toolbar h1{font-size:15px;margin:0 8px 0 0;font-weight:800;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#f3f4f6;margin-left:6px;}
+  .controls{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+  .controls select,.controls input,.controls button{font-size:12px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
+  .divider{width:100%;border-top:1px dashed #e5e7eb;margin-top:4px;padding-top:8px}
+  #map{flex:1 1 auto; position:relative; background:#f8fafc}
+  #canvas{position:absolute; inset:0; display:block; cursor:crosshair}
+  .legend{position:absolute; right:12px; bottom:30px; background:#fff; padding:10px 12px; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.12); min-width:220px}
+  .legend .row{display:flex; gap:8px; align-items:center; margin:4px 0}
+  .legend .sw{width:18px;height:12px;border-radius:3px;border:1px solid #e5e7eb}
+  .status{position:absolute; left:12px; bottom:12px; background:#fff; padding:8px 10px; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.1)}
+  .banner{position:absolute; top:12px; left:12px; background:#fff3f3; border:1px solid #ef4444; color:#991b1b; padding:8px 12px; border-radius:10px; display:none; max-width:760px}
+  .diag{position:absolute; right:12px; top:12px; width:360px; max-height:40vh; overflow:auto; background:#111827; color:#e5e7eb; font:11px/1.4 ui-monospace,Consolas,monospace; border-radius:10px; padding:8px 10px; box-shadow:0 8px 20px rgba(0,0,0,.15)}
+  .attribution{position:absolute; right:12px; bottom:8px; font:11px system-ui; color:#374151; background:#ffffffd9; border:1px solid #e5e7eb; border-radius:8px; padding:2px 8px;}
+  .attribution a{color:inherit;text-decoration:underline}
+  .range-wrap{display:inline-flex;align-items:center;gap:6px}
+  .range-val{min-width:36px;text-align:right;display:inline-block}
+
+  /* Identify panel */
+  .id-panel{
+    position:absolute; left:12px; top:12px; z-index:6;
+    width:480px; max-height:80vh; overflow:hidden;
+    display:flex; flex-direction:column;
+    background:#fff; border:1px solid #e5e7eb; border-radius:12px;
+    box-shadow:0 10px 28px rgba(0,0,0,.18); display:none;
+  }
+  .id-hd{
+    flex-shrink:0; display:flex; align-items:flex-start;
+    justify-content:space-between; gap:8px;
+    padding:10px 12px; border-bottom:1px solid #f1f5f9; background:#fff;
+  }
+  .id-hd b{font-size:13px; display:block;}
+  .id-hd .xy{color:#6b7280; font-size:11px; margin-top:2px;}
+  .id-hd button{border:1px solid #e5e7eb; background:#fff; border-radius:8px; padding:4px 8px; cursor:pointer; font-size:11px; white-space:nowrap;}
+  .id-search-bar{flex-shrink:0; padding:8px 12px; border-bottom:1px solid #f1f5f9;}
+  .id-search-bar input{width:100%; box-sizing:border-box; padding:6px 8px; border:1px solid #e5e7eb; border-radius:8px; font-size:12px;}
+  .id-body{flex:1 1 auto; overflow-y:auto; padding:0 0 8px 0;}
+
+  /* Attribute table */
+  .id-tbl{width:100%; border-collapse:collapse; font-size:11px;}
+  .id-tbl tr.grp-hdr td{
+    background:#1e3a5f; color:#e0f0ff;
+    font-weight:700; font-size:10px; text-transform:uppercase;
+    letter-spacing:.06em; padding:5px 10px; position:sticky;
+  }
+  .id-tbl tr.data-row:hover td{background:#f0f7ff;}
+  .id-tbl tr.data-row td{
+    padding:4px 10px; border-bottom:1px solid #f1f5f9;
+    vertical-align:middle;
+  }
+  .id-tbl td.lbl{color:#374151; width:62%; word-break:break-word; line-height:1.35;}
+  .id-tbl td.val{color:#111827; font-weight:600; white-space:nowrap; text-align:right;}
+  .id-tbl td.val.empty{color:#9ca3af; font-weight:400;}
+  .id-no-feature{padding:20px; text-align:center; color:#6b7280;}
+
+  .export-btns{display:flex;gap:5px;flex-wrap:wrap;flex-shrink:0;}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <h1>SVI AutoGenerator
+    <span class="pill" id="pillData">Data: Live</span>
+    <span class="pill" id="pillClass">Classification: Client</span>
+  </h1>
+  <div class="controls">
+    <label>Basemap <input type="checkbox" id="basemapChk" checked/></label>
+    <label>Data
+      <select id="dataSel">
+        <option value="live" selected>Live (ArcGIS)</option>
+        <option value="offline">Offline Demo</option>
+      </select>
+    </label>
+    <label>Year <select id="yearSel"><option value="2020" selected>2020</option><option value="2018">2018</option></select></label>
+    <label>Field
+      <select id="fieldSel">
+        <optgroup label="— Overall —">
+          <option value="RPL_THEMES" selected>Overall Social Vulnerability</option>
+        </optgroup>
+        <optgroup label="— Theme 1: Socioeconomic Status —">
+          <option value="RPL_THEME1">Theme 1 Composite Rank</option>
+          <option value="EP_POV150">% Below 150% Poverty Level</option>
+          <option value="EP_UNEMP">% Civilian Unemployed</option>
+          <option value="EP_HBURD">% Housing Cost Burdened</option>
+          <option value="EP_NOHSDP">% No High School Diploma</option>
+          <option value="EP_UNINSUR">% Uninsured</option>
+        </optgroup>
+        <optgroup label="— Theme 2: Household Characteristics —">
+          <option value="RPL_THEME2">Theme 2 Composite Rank</option>
+          <option value="EP_AGE65">% Age 65 or Older</option>
+          <option value="EP_AGE17">% Age 17 or Younger</option>
+          <option value="EP_DISABL">% With a Disability</option>
+          <option value="EP_SNGPNT">% Single-Parent Households</option>
+          <option value="EP_LIMENG">% Limited English Proficiency</option>
+        </optgroup>
+        <optgroup label="— Theme 3: Racial &amp; Ethnic Minority Status —">
+          <option value="RPL_THEME3">Theme 3 Composite Rank</option>
+          <option value="EP_MINRTY">% Racial &amp; Ethnic Minority</option>
+        </optgroup>
+        <optgroup label="— Theme 4: Housing Type &amp; Transportation —">
+          <option value="RPL_THEME4">Theme 4 Composite Rank</option>
+          <option value="EP_MUNIT">% Multi-Unit Structures</option>
+          <option value="EP_MOBILE">% Mobile Homes</option>
+          <option value="EP_CROWD">% Crowded Households</option>
+          <option value="EP_NOVEH">% No Vehicle Available</option>
+          <option value="EP_GROUPQ">% in Group Quarters</option>
+        </optgroup>
+        <optgroup label="— Population Estimates —">
+          <option value="E_TOTPOP">Total Population</option>
+          <option value="E_HU">Total Housing Units</option>
+          <option value="E_HH">Total Households</option>
+        </optgroup>
+      </select>
+    </label>
+    <label>AutoGenerator
+      <select id="autoSel">
+        <option value="client" selected>Client (Quantile/Jenks/Equal)</option>
+        <option value="server">Server (/generateRenderer)</option>
+      </select>
+    </label>
+    <label>Method
+      <select id="methodSel">
+        <option value="quantile" selected>Quantile</option>
+        <option value="natural-breaks">Natural Breaks (Jenks)</option>
+        <option value="equal-interval">Equal Interval</option>
+        <option value="standard-deviation">Std Dev (server only)</option>
+      </select>
+    </label>
+    <label>Classes <select id="classSel"><option>5</option><option selected>6</option><option>7</option><option>8</option></select></label>
+    <label>State <input id="stateInput" size="3" placeholder="TN" value="TN"/></label>
+    <label>County <input id="countyInput" size="10" placeholder="Davidson" value="Davidson"/></label>
+    <label title="Automatically switch to offline mode on error"><input type="checkbox" id="autoFallback" checked/> 🛟 Auto fallback</label>
+    <button id="applyBtn">Apply</button>
+  </div>
+
+  <div class="controls divider">
+    <label>Palette
+      <select id="paletteSel">
+        <option value="YlOrRd" selected>YlOrRd</option><option value="YlGnBu">YlGnBu</option>
+        <option value="Blues">Blues</option><option value="Greens">Greens</option>
+        <option value="Purples">Purples</option><option value="Oranges">Oranges</option>
+        <option value="PuRd">PuRd</option><option value="RdPu">RdPu</option><option value="Viridis">Viridis</option>
+      </select>
+    </label>
+    <label title="Reverse color order"><input type="checkbox" id="reverseChk"> Reverse</label>
+    <label title="Use selected palette instead of server colors"><input type="checkbox" id="overrideChk" checked> Override server colors</label>
+    <label>Opacity
+      <span class="range-wrap">
+        <input type="range" id="opacityRange" min="0.2" max="1" step="0.05" value="0.9">
+        <span id="opacityValue" class="range-val">0.90</span>
+      </span>
+    </label>
+  </div>
+</div>
+
+<div id="map">
+  <canvas id="canvas"></canvas>
+
+  <!-- Identify panel — opens on any map click -->
+  <div id="idPanel" class="id-panel">
+    <div class="id-hd">
+      <div>
+        <b id="idTitle">Feature Info</b>
+        <div class="xy" id="idXY"></div>
+      </div>
+      <div class="export-btns">
+        <button id="btnCsvAll" title="Download all attributes as CSV">CSV</button>
+        <button id="btnCopyJson" title="Copy attributes as JSON">JSON</button>
+        <button id="btnGeoJSON" title="Download feature as GeoJSON">GeoJSON</button>
+        <button id="idClose">✕</button>
+      </div>
+    </div>
+    <div class="id-search-bar">
+      <input id="idSearch" type="text" placeholder="Search attributes…"/>
+    </div>
+    <div class="id-body">
+      <div id="idKV"></div>
+    </div>
+  </div>
+
+  <div id="legend" class="legend" style="display:none">
+    <div class="legend-title" id="legendTitle">Legend</div>
+    <div id="legendRows"></div>
+  </div>
+  <div id="statusBox" class="status">Ready — click any tract to inspect</div>
+  <div id="banner" class="banner"></div>
+  <pre id="diag" class="diag"></pre>
+  <div class="attribution" id="attr">© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors</div>
+</div>
+
+<script>
+/* ===== Constants / Palettes ===== */
+const SVI_2018_BASE="https://services3.arcgis.com/ZvidGQkLaDJxRSJ2/ArcGIS/rest/services/CDC_Social_Vulnerability_Index_2018/FeatureServer";
+const SVI_2020_BASE="https://services3.arcgis.com/ZvidGQkLaDJxRSJ2/ArcGIS/rest/services/CDC_ATSDR_Social_Vulnerability_Index_2020_USA/FeatureServer";
+const TILE_URL=(z,x,y)=>`https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+const WORLD_ENV={xmin:-180,ymin:-85,xmax:180,ymax:85};
+const PALETTES={
+  YlOrRd:['#ffffcc','#ffeda0','#fed976','#feb24c','#fd8d3c','#fc4e2a','#e31a1c','#bd0026','#800026'],
+  YlGnBu:['#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58'],
+  Blues:['#f7fbff','#deebf7','#c6dbef','#9ecae1','#6baed6','#4292c6','#2171b5','#08519c','#08306b'],
+  Greens:['#f7fcf5','#e5f5e0','#c7e9c0','#a1d99b','#74c476','#41ab5d','#238b45','#006d2c','#00441b'],
+  Purples:['#fcfbfd','#efedf5','#dadaeb','#bcbddc','#9e9ac8','#807dba','#6a51a3','#54278f','#3f007d'],
+  Oranges:['#fff5eb','#fee6ce','#fdd0a2','#fdae6b','#fd8d3c','#f16913','#d94801','#a63603','#7f2704'],
+  PuRd:['#f7f4f9','#e7e1ef','#d4b9da','#c994c7','#df65b0','#e7298a','#ce1256','#980043','#67001f'],
+  RdPu:['#fff7f3','#fde0dd','#fcc5c0','#fa9fb5','#f768a1','#dd3497','#ae017e','#7a0177','#49006a'],
+  Viridis:['#fde725','#b8de29','#55c667','#2fb47c','#1fa187','#277f8e','#365c8d','#46327e','#440154']
+};
+
+/* ===== SVI Field Descriptions ===== */
+const FIELD_DESCRIPTIONS = {
+  // Location / ID
+  ST:         'State FIPS Code',
+  STATE:      'State Name',
+  ST_ABBR:    'State Abbreviation',
+  STCNTY:     'State–County FIPS Code',
+  COUNTY:     'County Name',
+  CNTY:       'County Name',
+  FIPS:       'Tract FIPS Code',
+  TRACT:      'Census Tract Number',
+  AFFGEOID:   'American Community Survey GeoID',
+  GEOID:      'Geographic Identifier (FIPS)',
+  NAME:       'Census Tract Name',
+  LOCATION:   'Location (County, State)',
+  AREA_SQMI:  'Area (Square Miles)',
+  // Population
+  E_TOTPOP:   'Total Population (Estimate)',
+  M_TOTPOP:   'Total Population (Margin of Error)',
+  E_HU:       'Total Housing Units (Estimate)',
+  M_HU:       'Total Housing Units (Margin of Error)',
+  E_HH:       'Total Households (Estimate)',
+  M_HH:       'Total Households (Margin of Error)',
+  // Overall SVI
+  SPL_THEMES: 'Sum of Series — All Themes',
+  RPL_THEMES: 'Overall Social Vulnerability Percentile Rank',
+  F_THEMES:   'Flag Count — All Themes (top 10%)',
+  // Theme 1 — Socioeconomic Status
+  E_POV150:   'Population Below 150% Poverty (Estimate)',
+  EP_POV150:  '% Persons Below 150% Poverty Level',
+  MP_POV150:  '% Poverty (Margin of Error)',
+  EPL_POV150: 'Percentile Rank — Poverty',
+  F_POV150:   'Flag — Poverty (1 = top 10%)',
+  E_UNEMP:    'Civilian Unemployed Population (Estimate)',
+  EP_UNEMP:   '% Civilian Unemployed (Age 16+)',
+  MP_UNEMP:   '% Unemployed (Margin of Error)',
+  EPL_UNEMP:  'Percentile Rank — Unemployment',
+  F_UNEMP:    'Flag — Unemployment (1 = top 10%)',
+  E_HBURD:    'Housing Cost Burdened Households (Estimate)',
+  EP_HBURD:   '% Housing Cost Burdened (>30% income)',
+  MP_HBURD:   '% Housing Burdened (Margin of Error)',
+  EPL_HBURD:  'Percentile Rank — Housing Cost Burden',
+  F_HBURD:    'Flag — Housing Burden (1 = top 10%)',
+  E_NOHSDP:   'No High School Diploma Population (Estimate)',
+  EP_NOHSDP:  '% No High School Diploma (Age 25+)',
+  MP_NOHSDP:  '% No Diploma (Margin of Error)',
+  EPL_NOHSDP: 'Percentile Rank — No High School Diploma',
+  F_NOHSDP:   'Flag — No High School Diploma (1 = top 10%)',
+  E_UNINSUR:  'Uninsured Population (Estimate)',
+  EP_UNINSUR: '% Civilian Uninsured',
+  MP_UNINSUR: '% Uninsured (Margin of Error)',
+  EPL_UNINSUR:'Percentile Rank — Uninsured',
+  F_UNINSUR:  'Flag — Uninsured (1 = top 10%)',
+  SPL_THEME1: 'Sum of Series — Theme 1',
+  RPL_THEME1: 'Theme 1 Percentile Rank (Socioeconomic)',
+  F_THEME1:   'Flag Count — Theme 1',
+  // Theme 2 — Household Characteristics
+  E_AGE65:    'Population Age 65+ (Estimate)',
+  EP_AGE65:   '% Population Age 65 or Older',
+  MP_AGE65:   '% Age 65+ (Margin of Error)',
+  EPL_AGE65:  'Percentile Rank — Age 65+',
+  F_AGE65:    'Flag — Age 65+ (1 = top 10%)',
+  E_AGE17:    'Population Age 17 and Under (Estimate)',
+  EP_AGE17:   '% Population Age 17 or Younger',
+  MP_AGE17:   '% Age 17 and Under (Margin of Error)',
+  EPL_AGE17:  'Percentile Rank — Age 17 and Under',
+  F_AGE17:    'Flag — Age 17 and Under (1 = top 10%)',
+  E_DISABL:   'Civilian Population With Disability (Estimate)',
+  EP_DISABL:  '% Civilian Non-institutionalized With Disability',
+  MP_DISABL:  '% Disability (Margin of Error)',
+  EPL_DISABL: 'Percentile Rank — Disability',
+  F_DISABL:   'Flag — Disability (1 = top 10%)',
+  E_SNGPNT:   'Single-Parent Households (Estimate)',
+  EP_SNGPNT:  '% Single-Parent Households With Children Under 18',
+  MP_SNGPNT:  '% Single-Parent (Margin of Error)',
+  EPL_SNGPNT: 'Percentile Rank — Single-Parent Households',
+  F_SNGPNT:   'Flag — Single-Parent Households (1 = top 10%)',
+  E_LIMENG:   'Population With Limited English (Estimate)',
+  EP_LIMENG:  '% Population (Age 5+) Who Speak English Less Than "Well"',
+  MP_LIMENG:  '% Limited English (Margin of Error)',
+  EPL_LIMENG: 'Percentile Rank — Limited English Proficiency',
+  F_LIMENG:   'Flag — Limited English (1 = top 10%)',
+  SPL_THEME2: 'Sum of Series — Theme 2',
+  RPL_THEME2: 'Theme 2 Percentile Rank (Household Characteristics)',
+  F_THEME2:   'Flag Count — Theme 2',
+  // Theme 3 — Racial & Ethnic Minority Status
+  E_MINRTY:   'Racial & Ethnic Minority Population (Estimate)',
+  EP_MINRTY:  '% Racial and Ethnic Minority (non-White or Hispanic/Latino)',
+  MP_MINRTY:  '% Minority (Margin of Error)',
+  EPL_MINRTY: 'Percentile Rank — Minority Status',
+  F_MINRTY:   'Flag — Minority Status (1 = top 10%)',
+  SPL_THEME3: 'Sum of Series — Theme 3',
+  RPL_THEME3: 'Theme 3 Percentile Rank (Racial & Ethnic Minority)',
+  F_THEME3:   'Flag Count — Theme 3',
+  // Theme 4 — Housing Type & Transportation
+  E_MUNIT:    'Housing Units in Multi-Unit Structures (Estimate)',
+  EP_MUNIT:   '% Housing in Multi-Unit Structures (10+ units)',
+  MP_MUNIT:   '% Multi-Unit (Margin of Error)',
+  EPL_MUNIT:  'Percentile Rank — Multi-Unit Housing',
+  F_MUNIT:    'Flag — Multi-Unit Housing (1 = top 10%)',
+  E_MOBILE:   'Mobile Homes (Estimate)',
+  EP_MOBILE:  '% Mobile Homes',
+  MP_MOBILE:  '% Mobile Homes (Margin of Error)',
+  EPL_MOBILE: 'Percentile Rank — Mobile Homes',
+  F_MOBILE:   'Flag — Mobile Homes (1 = top 10%)',
+  E_CROWD:    'Crowded Households (Estimate)',
+  EP_CROWD:   '% Households With More Than 1 Person Per Room',
+  MP_CROWD:   '% Crowded Households (Margin of Error)',
+  EPL_CROWD:  'Percentile Rank — Crowded Housing',
+  F_CROWD:    'Flag — Crowded Housing (1 = top 10%)',
+  E_NOVEH:    'Households With No Vehicle (Estimate)',
+  EP_NOVEH:   '% Households With No Vehicle Available',
+  MP_NOVEH:   '% No Vehicle (Margin of Error)',
+  EPL_NOVEH:  'Percentile Rank — No Vehicle',
+  F_NOVEH:    'Flag — No Vehicle (1 = top 10%)',
+  E_GROUPQ:   'Population in Group Quarters (Estimate)',
+  EP_GROUPQ:  '% Population in Group Quarters',
+  MP_GROUPQ:  '% Group Quarters (Margin of Error)',
+  EPL_GROUPQ: 'Percentile Rank — Group Quarters',
+  F_GROUPQ:   'Flag — Group Quarters (1 = top 10%)',
+  SPL_THEME4: 'Sum of Series — Theme 4',
+  RPL_THEME4: 'Theme 4 Percentile Rank (Housing & Transportation)',
+  F_THEME4:   'Flag Count — Theme 4',
+};
+
+/* Ordered field groups for the identify panel */
+const FIELD_GROUPS = [
+  { label: 'Location & Identifiers',
+    keys: ['ST','STATE','ST_ABBR','STCNTY','COUNTY','CNTY','FIPS','TRACT','AFFGEOID','GEOID','NAME','LOCATION','AREA_SQMI'] },
+  { label: 'Population Estimates',
+    keys: ['E_TOTPOP','M_TOTPOP','E_HU','M_HU','E_HH','M_HH'] },
+  { label: 'Overall Social Vulnerability',
+    keys: ['SPL_THEMES','RPL_THEMES','F_THEMES'] },
+  { label: 'Theme 1 — Socioeconomic Status',
+    keys: ['RPL_THEME1','SPL_THEME1','F_THEME1',
+           'EP_POV150','MP_POV150','EPL_POV150','F_POV150',
+           'EP_UNEMP','MP_UNEMP','EPL_UNEMP','F_UNEMP',
+           'EP_HBURD','MP_HBURD','EPL_HBURD','F_HBURD',
+           'EP_NOHSDP','MP_NOHSDP','EPL_NOHSDP','F_NOHSDP',
+           'EP_UNINSUR','MP_UNINSUR','EPL_UNINSUR','F_UNINSUR'] },
+  { label: 'Theme 2 — Household Characteristics',
+    keys: ['RPL_THEME2','SPL_THEME2','F_THEME2',
+           'EP_AGE65','MP_AGE65','EPL_AGE65','F_AGE65',
+           'EP_AGE17','MP_AGE17','EPL_AGE17','F_AGE17',
+           'EP_DISABL','MP_DISABL','EPL_DISABL','F_DISABL',
+           'EP_SNGPNT','MP_SNGPNT','EPL_SNGPNT','F_SNGPNT',
+           'EP_LIMENG','MP_LIMENG','EPL_LIMENG','F_LIMENG'] },
+  { label: 'Theme 3 — Racial & Ethnic Minority Status',
+    keys: ['RPL_THEME3','SPL_THEME3','F_THEME3',
+           'EP_MINRTY','MP_MINRTY','EPL_MINRTY','F_MINRTY'] },
+  { label: 'Theme 4 — Housing Type & Transportation',
+    keys: ['RPL_THEME4','SPL_THEME4','F_THEME4',
+           'EP_MUNIT','MP_MUNIT','EPL_MUNIT','F_MUNIT',
+           'EP_MOBILE','MP_MOBILE','EPL_MOBILE','F_MOBILE',
+           'EP_CROWD','MP_CROWD','EPL_CROWD','F_CROWD',
+           'EP_NOVEH','MP_NOVEH','EPL_NOVEH','F_NOVEH',
+           'EP_GROUPQ','MP_GROUPQ','EPL_GROUPQ','F_GROUPQ'] },
+];
+
+function getFieldLabel(key) {
+  const u = key.toUpperCase();
+  if (FIELD_DESCRIPTIONS[u]) return FIELD_DESCRIPTIONS[u];
+  const meta = layerFieldInfos[u];
+  if (meta && meta.alias && meta.alias !== meta.name) return meta.alias;
+  return key;
+}
+
+function esriMethod(m){return m==='quantile'?'esriClassifyQuantile':m==='natural-breaks'?'esriClassifyNaturalBreaks':m==='equal-interval'?'esriClassifyEqualInterval':m==='standard-deviation'?'esriClassifyStandardDeviation':'esriClassifyQuantile';}
+function sampleColors(name,n,reverse){const base=(PALETTES[name]||PALETTES.YlOrRd);const a=[];for(let i=0;i<n;i++){const t=i/(n-1),idx=Math.round(t*(base.length-1));a.push(base[idx]);}return reverse?a.reverse():a;}
+function hexToRgb(hex){const h=hex.replace('#','');const b=parseInt(h.length===3?h.split('').map(c=>c+c).join(''):h,16);return {r:(b>>16)&255,g:(b>>8)&255,b:b&255};}
+function rgbaStr(hex,a){const {r,g,b}=hexToRgb(hex);return `rgba(${r},${g},${b},${a})`;}
+
+/* ===== Offline Sample ===== */
+const OFFLINE={type:"FeatureCollection",features:[
+ {type:"Feature",properties:{GEOID:"47037010100",COUNTY:"Davidson",ST_ABBR:"TN",RPL_THEMES:0.82,RPL_THEME1:0.74,RPL_THEME2:0.68,RPL_THEME3:0.91,RPL_THEME4:0.55,EP_POV150:28.3,EP_UNEMP:9.1,EP_UNINSUR:14.2,E_TOTPOP:3821},geometry:{type:"Polygon",coordinates:[[[-86.90,36.18],[-86.80,36.18],[-86.80,36.24],[-86.90,36.24],[-86.90,36.18]]]}},
+ {type:"Feature",properties:{GEOID:"47037010200",COUNTY:"Davidson",ST_ABBR:"TN",RPL_THEMES:0.35,RPL_THEME1:0.42,RPL_THEME2:0.30,RPL_THEME3:0.28,RPL_THEME4:0.40,EP_POV150:10.1,EP_UNEMP:3.2,EP_UNINSUR:6.8,E_TOTPOP:4512},geometry:{type:"Polygon",coordinates:[[[-86.80,36.18],[-86.70,36.18],[-86.70,36.24],[-86.80,36.24],[-86.80,36.18]]]}},
+ {type:"Feature",properties:{GEOID:"47037010300",COUNTY:"Davidson",ST_ABBR:"TN",RPL_THEMES:0.60,RPL_THEME1:0.58,RPL_THEME2:0.62,RPL_THEME3:0.55,RPL_THEME4:0.65,EP_POV150:18.7,EP_UNEMP:5.8,EP_UNINSUR:11.3,E_TOTPOP:2988},geometry:{type:"Polygon",coordinates:[[[-86.90,36.12],[-86.80,36.12],[-86.80,36.18],[-86.90,36.18],[-86.90,36.12]]]}},
+ {type:"Feature",properties:{GEOID:"47037010400",COUNTY:"Davidson",ST_ABBR:"TN",RPL_THEMES:0.10,RPL_THEME1:0.12,RPL_THEME2:0.15,RPL_THEME3:0.08,RPL_THEME4:0.11,EP_POV150:4.2,EP_UNEMP:1.9,EP_UNINSUR:3.1,E_TOTPOP:5234},geometry:{type:"Polygon",coordinates:[[[-86.80,36.12],[-86.70,36.12],[-86.70,36.18],[-86.80,36.18],[-86.80,36.12]]]}}
+]};
+
+/* ===== State / DOM ===== */
+const canvas=document.getElementById('canvas'), ctx=canvas.getContext('2d');
+const mapDiv=document.getElementById('map'), bannerEl=document.getElementById('banner');
+const legendEl=document.getElementById('legend'), legendRowsEl=document.getElementById('legendRows'), legendTitleEl=document.getElementById('legendTitle');
+const pillData=document.getElementById('pillData'), pillClass=document.getElementById('pillClass'), statusEl=document.getElementById('statusBox');
+const diag=document.getElementById('diag'), basemapChk=document.getElementById('basemapChk');
+const dataSel=document.getElementById('dataSel'), yearSel=document.getElementById('yearSel'), fieldSel=document.getElementById('fieldSel');
+const autoSel=document.getElementById('autoSel'), methodSel=document.getElementById('methodSel'), classSel=document.getElementById('classSel');
+const stateInput=document.getElementById('stateInput'), countyInput=document.getElementById('countyInput'), applyBtn=document.getElementById('applyBtn');
+const paletteSel=document.getElementById('paletteSel'), reverseChk=document.getElementById('reverseChk'), overrideChk=document.getElementById('overrideChk');
+const opRange=document.getElementById('opacityRange'), opVal=document.getElementById('opacityValue');
+const idPanel=document.getElementById('idPanel'), idClose=document.getElementById('idClose');
+const idKV=document.getElementById('idKV'), idTitle=document.getElementById('idTitle'), idXY=document.getElementById('idXY');
+const btnCsvAll=document.getElementById('btnCsvAll'), btnCopyJson=document.getElementById('btnCopyJson'), btnGeoJSON=document.getElementById('btnGeoJSON');
+const idSearch=document.getElementById('idSearch');
+
+let W=0,H=0,dpr=1, center={lon:-86.7816,lat:36.1627}, zoom=11;
+let features=[], field="RPL_THEMES", breaks=[], colors=[];
+let dataMode="live", classMode="client", method="quantile", k=6;
+let resolvedFields=new Set(), layerFieldInfos={}, paletteName="YlOrRd", paletteReverse=false, paletteOverride=true, layerOpacity=0.9;
+let dragging=false, startPx=null, startCenter=null, moved=false;
+let selectedFeature=null, currentProps=null;
+
+/* ===== Projection / Clamp ===== */
+const tileSize=256;
+function clampLat(lat){ return Math.max(-85, Math.min(85, lat)); }
+function lon2x(lon,z){const n=2**z;return (lon+180)/360*n*tileSize;}
+function lat2y(lat,z){lat=clampLat(lat);const r=lat*Math.PI/180,n=2**z;const y=(1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2;return y*n*tileSize;}
+function x2lon(x,z){const n=2**z;return x/(n*tileSize)*360-180;}
+function y2lat(y,z){const n=2**z;const a=Math.PI-2*Math.PI*y/(n*tileSize);return 180/Math.PI*Math.atan(0.5*(Math.exp(a)-Math.exp(-a)));}
+
+/* ===== Diagnostics / Banner ===== */
+function log(...args){diag.textContent += args.join(' ') + "\n";}
+window.addEventListener('error',e=>{log("JS Error:",e.message,"@",e.filename+":"+e.lineno);showBanner("Script error: "+e.message);});
+function showBanner(html){bannerEl.innerHTML=html;bannerEl.style.display='block';}
+function hideBanner(){bannerEl.style.display='none';}
+function setStatus(t){statusEl.textContent=t;}
+function syncPills(){pillData.textContent="Data: "+(dataMode==='live'?"Live":"Offline");pillClass.textContent="Classification: "+(classMode==='server'?"Server":"Client");}
+
+/* ===== Map Interaction ===== */
+canvas.addEventListener('mousedown',ev=>{dragging=true;moved=false;startPx={x:ev.clientX,y:ev.clientY};startCenter={...center};});
+window.addEventListener('mouseup',()=>dragging=false);
+window.addEventListener('mousemove',ev=>{
+  if(!dragging) return;
+  const dx=ev.clientX-startPx.x, dy=ev.clientY-startPx.y;
+  if(Math.abs(dx)>3||Math.abs(dy)>3) moved=true;
+  const x0=lon2x(startCenter.lon,zoom), y0=lat2y(startCenter.lat,zoom);
+  center={lon:x2lon(x0-dx,zoom),lat:clampLat(y2lat(y0-dy,zoom))}; draw();
+});
+canvas.addEventListener('wheel',ev=>{
+  ev.preventDefault();
+  const dir=ev.deltaY>0?-1:1, prevZ=zoom;
+  zoom=Math.max(2,Math.min(18,zoom+dir));
+  if(zoom!==prevZ){
+    const mx=ev.offsetX,my=ev.offsetY, xB=lon2x(center.lon,prevZ)+(mx-W/2), yB=lat2y(center.lat,prevZ)+(my-H/2);
+    const lonM=x2lon(xB,prevZ), latM=y2lat(yB,prevZ);
+    const xA=lon2x(lonM,zoom), yA=lat2y(latM,zoom);
+    center.lon=x2lon(xA-(mx-W/2),zoom);
+    center.lat=clampLat(y2lat(yA-(my-H/2),zoom));
+  }
+  draw();
+},{passive:false});
+
+/* ===== Map Click — always identify ===== */
+canvas.addEventListener('click',(ev)=>{
+  if(moved) return;
+  const lon=x2lon(lon2x(center.lon,zoom)+(ev.offsetX-W/2),zoom);
+  const lat=y2lat(lat2y(center.lat,zoom)+(ev.offsetY-H/2),zoom);
+  const hit=findFeatureAt(lon,lat);
+  selectedFeature = hit || null;
+  renderIdentify(hit, lon, lat);
+  draw();
+});
+
+idClose.onclick=()=>{ idPanel.style.display='none'; selectedFeature=null; draw(); };
+idSearch.addEventListener('input',()=>{ if(currentProps) renderKV(currentProps); });
+
+/* ===== Canvas / Drawing ===== */
+function resize(){
+  W=mapDiv.clientWidth; H=mapDiv.clientHeight; dpr=window.devicePixelRatio||1;
+  canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
+  canvas.style.width=W+"px"; canvas.style.height=H+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0); draw();
+}
+window.addEventListener('resize',resize);
+
+const tileCache=new Map();
+function drawTiles(){
+  if(!basemapChk.checked) return;
+  const n=2**zoom;
+  const xC=lon2x(center.lon,zoom), yC=lat2y(center.lat,zoom);
+  const left=xC-W/2, top=yC-H/2, right=xC+W/2, bottom=yC+H/2;
+  let xStart=Math.floor(left/tileSize), yStart=Math.floor(top/tileSize);
+  let xEnd=Math.floor(right/tileSize), yEnd=Math.floor(bottom/tileSize);
+  for(let ty=Math.max(0,yStart);ty<=Math.min(n-1,yEnd);ty++){
+    for(let tx=xStart;tx<=xEnd;tx++){
+      const txw=((tx%n)+n)%n, key=`${zoom}/${txw}/${ty}`;
+      const dx=Math.round(tx*tileSize-left), dy=Math.round(ty*tileSize-top);
+      const img=tileCache.get(key);
+      if(img&&img.complete){ctx.drawImage(img,dx,dy,tileSize,tileSize);}
+      else if(!img){const im=new Image();im.crossOrigin="anonymous";im.decoding="async";im.onload=()=>{tileCache.set(key,im);requestAnimationFrame(draw);};im.src=TILE_URL(zoom,txw,ty);tileCache.set(key,im);}
+    }
+  }
+}
+function drawGrid(){ctx.strokeStyle="#e5e7eb";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,H/2);ctx.lineTo(W,H/2);ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();}
+function projectPoint(lon,lat){const x=lon2x(lon,zoom),y=lat2y(lat,zoom),xC=lon2x(center.lon,zoom),yC=lat2y(center.lat,zoom);return {x:(x-xC)+W/2,y:(y-yC)+H/2};}
+function drawPoly(rings){ctx.beginPath();for(const ring of rings){for(let i=0;i<ring.length;i++){const [lo,la]=ring[i];const p=projectPoint(lo,la);if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);}}ctx.fill();}
+function strokePoly(rings){ctx.beginPath();for(const ring of rings){for(let i=0;i<ring.length;i++){const [lo,la]=ring[i];const p=projectPoint(lo,la);if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);}}ctx.stroke();}
+function colorForValue(v){if(!Number.isFinite(v)||!breaks.length)return '#d1d5db';let idx=0;for(;idx<breaks.length;idx++){if(v<=breaks[idx])break;}return colors[Math.min(colors.length-1,idx)];}
+
+function draw(){
+  ctx.save();ctx.fillStyle="#eef2f7";ctx.fillRect(0,0,W,H);drawTiles();ctx.restore();
+  drawGrid();
+  ctx.lineWidth=0.5;
+  for(const f of features){
+    const g=f.geometry,v=Number(f.properties[field]),fill=colorForValue(v);
+    ctx.fillStyle=fill;ctx.globalAlpha=layerOpacity;ctx.strokeStyle='#6b7280';
+    if(g.type==='Polygon'){drawPoly(g.coordinates);strokePoly(g.coordinates);}
+    else if(g.type==='MultiPolygon'){for(const part of g.coordinates){drawPoly(part);strokePoly(part);}}
+  }
+  // highlight selected feature
+  if(selectedFeature){
+    ctx.save();ctx.globalAlpha=1.0;ctx.lineWidth=2.5;ctx.strokeStyle='#1d4ed8';ctx.fillStyle='rgba(29,78,216,0.08)';
+    const g=selectedFeature.geometry;
+    if(g.type==='Polygon'){drawPoly(g.coordinates);ctx.stroke();}
+    else if(g.type==='MultiPolygon'){for(const part of g.coordinates){drawPoly(part);ctx.stroke();}}
+    ctx.restore();
+  }
+}
+
+/* ===== Classification / Legend ===== */
+function quantileBreaks(vs,k){const v=vs.filter(Number.isFinite).sort((a,b)=>a-b);if(!v.length)return[];const br=[];for(let i=1;i<k;i++){const pos=(v.length-1)*i/k,b=Math.floor(pos),r=pos-b;br.push(r===0?v[b]:v[b]*(1-r)+v[b+1]*r);}return br;}
+function jenksBreaks(vs,k){const v=vs.filter(Number.isFinite).sort((a,b)=>a-b),n=v.length;if(!n)return[];k=Math.min(k,n);const m1=Array.from({length:n+1},()=>Array(k+1).fill(0)),m2=Array.from({length:n+1},()=>Array(k+1).fill(0));for(let i=1;i<=k;i++){m1[0][i]=1;for(let j=1;j<=n;j++)m2[j][i]=Infinity;}let s1=0,s2=0,w=0;for(let i=1;i<=n;i++){const val=v[i-1];s1+=val;s2+=val*val;w++;m1[i][1]=1;m2[i][1]=s2-(s1*s1)/w;}for(let m=2;m<=k;m++){for(let i=m;i<=n;i++){let s1=0,s2=0,w=0;m2[i][m]=Infinity;for(let j=i-1;j>=m-1;j--){const val=v[j];s1+=val;s2+=val*val;w++;const cost=s2-(s1*s1)/w;if(m2[j][m-1]+cost<m2[i][m]){m1[i][m]=j+1;m2[i][m]=m2[j][m-1]+cost;}}}}const br=[v[0]];let kc=n,cnt=k;while(cnt>1){const id=m1[kc][cnt]-1;br.push(v[id]);kc=id;cnt--;}br.push(v[n-1]);br.sort((a,b)=>a-b);const up=[];for(let i=1;i<br.length;i++)up.push(br[i]);return up.slice(0,k-1);}
+function equalBreaks(vs,k){const v=vs.filter(Number.isFinite);if(!v.length)return[];const mn=Math.min(...v),mx=Math.max(...v);const br=[];for(let i=1;i<k;i++)br.push(mn+(mx-mn)*i/k);return br;}
+function clientClassify(){const vals=features.map(f=>Number(f.properties[field])).filter(Number.isFinite);const kk=Math.max(2,Math.min(8,k));let br;if(method==='quantile')br=quantileBreaks(vals,kk);else if(method==='natural-breaks')br=jenksBreaks(vals,kk);else br=equalBreaks(vals,kk);breaks=br;colors=sampleColors(paletteName,breaks.length+1,paletteReverse);drawLegend();}
+function drawLegend(){const vals=features.map(f=>Number(f.properties[field])).filter(Number.isFinite);if(!vals.length){legendEl.style.display='none';return;}const min=Math.min(...vals),max=Math.max(...vals);legendRowsEl.innerHTML='';for(let i=0;i<colors.length;i++){const lo=(i===0?min:breaks[i-1]),hi=(i<breaks.length?breaks[i]:max);const sw=rgbaStr(colors[i],layerOpacity);const row=document.createElement('div');row.className='row';row.innerHTML=`<span class="sw" style="background:${sw}"></span>${lo.toFixed(3)} – ${hi.toFixed(3)}`;legendRowsEl.appendChild(row);}legendTitleEl.textContent=`Legend — ${getFieldLabel(field)} (${classMode==='server'?'server':'client'} ${methodSel.value}, k=${k})`;legendEl.style.display='block';}
+
+/* ===== Layer Metadata ===== */
+async function resolveLayerUrl(baseUrl){
+  for(const id of [3,2,1,0]){
+    try{
+      const r=await fetch(`${baseUrl}/${id}?f=json`);if(!r.ok)continue;
+      const meta=await r.json();if(meta.error)continue;
+      const fields=meta.fields||[];
+      const hasRPL=fields.some(f=>(f.name||"").toUpperCase()==="RPL_THEMES"||(f.name||"").toUpperCase().startsWith("RPL_THEME"));
+      const isPoly=(meta.geometryType||"").toLowerCase().includes("polygon");
+      if(hasRPL&&isPoly){
+        resolvedFields=new Set(fields.map(f=>(f.name||"").toUpperCase()));
+        layerFieldInfos={};for(const f of fields){const key=(f.name||"").toUpperCase();layerFieldInfos[key]={name:f.name,alias:f.alias||f.name,type:f.type||""};}
+        log(`✔ Layer resolved: ${baseUrl}/${id}, fields=${fields.length}`);
+        return `${baseUrl}/${id}`;
+      }
+    }catch(_){}
+  }
+  try{
+    const r2=await fetch(`${baseUrl}/2?f=json`);
+    if(r2.ok){const m2=await r2.json();const fields2=m2.fields||[];resolvedFields=new Set(fields2.map(f=>(f.name||"").toUpperCase()));layerFieldInfos={};for(const f of fields2){const key=(f.name||"").toUpperCase();layerFieldInfos[key]={name:f.name,alias:f.alias||f.name,type:f.type||""};}}
+  }catch(_){}
+  log(`⚠ Auto-discovery failed → using /2`);
+  return `${baseUrl}/2`;
+}
+async function layerUrlByYear(){const base=(yearSel.value==='2020')?SVI_2020_BASE:SVI_2018_BASE;return await resolveLayerUrl(base);}
+
+/* ===== Where Clause Builder ===== */
+function buildWhereWithFields(){
+  const s=(stateInput.value||'').trim().toUpperCase();
+  const c=(countyInput.value||'').trim().toUpperCase();
+  const parts=[];
+  if(s){const w=[];if(resolvedFields.has("ST_ABBR"))w.push(`UPPER(ST_ABBR)='${s}'`);if(resolvedFields.has("ST"))w.push(`UPPER(ST)='${s}'`);if(resolvedFields.has("STATE"))w.push(`UPPER(STATE)='${s}'`);if(w.length)parts.push(w.join(" OR "));}
+  if(c){const w=[];if(resolvedFields.has("COUNTY"))w.push(`UPPER(COUNTY) LIKE '${c}%'`);if(resolvedFields.has("CNTY"))w.push(`UPPER(CNTY) LIKE '${c}%'`);if(resolvedFields.has("NAME"))w.push(`UPPER(NAME) LIKE '${c}% COUNTY'`);if(w.length)parts.push(w.join(" OR "));}
+  if(!parts.length)return "1=1";return parts.length===2?`((${parts[0]}) AND (${parts[1]}))`:`(${parts[0]})`;
+}
+
+/* ===== Query & Server Renderer ===== */
+async function queryFeaturesGeoJSON(url,where,env,outFields,maxTotal=5000){
+  const params={f:"geojson",where,outFields:"*",returnGeometry:true,
+    geometry:JSON.stringify({xmin:env.xmin,ymin:env.ymin,xmax:env.xmax,ymax:env.ymax,spatialReference:{wkid:4326}}),
+    geometryType:"esriGeometryEnvelope",inSR:4326,spatialRel:"esriSpatialRelIntersects",outSR:4326,
+    resultRecordCount:2000,resultOffset:0};
+  let all=[];for(let offset=0;offset<maxTotal;offset+=2000){
+    params.resultOffset=offset;
+    const resp=await fetch(url+"/query",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams(params)});
+    if(!resp.ok)throw new Error("HTTP "+resp.status+" on /query");
+    const gj=await resp.json();if(gj&&gj.error)throw new Error(`ArcGIS error ${gj.error.code}: ${gj.error.message}`);
+    if(!gj||!gj.features)break;all=all.concat(gj.features);if(gj.features.length<2000)break;
+  }return all;
+}
+async function serverRenderer(url,field,method,k,where){
+  const def={type:"classBreaksDef",classificationField:field,classificationMethod:esriMethod(method),breakCount:k,
+    baseSymbol:{type:"esriSFS",style:"esriSFSSolid",outline:{type:"esriSLS",style:"esriSLSSolid",color:[120,120,120,255],width:0.5}},
+    colorRamp:{type:"algorithmic",fromColor:[255,247,236,255],toColor:[153,0,0,255],algorithm:"esriHSVAlgorithm"}};
+  const r=await fetch(url+"/generateRenderer",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({f:"json",classificationDef:JSON.stringify(def),where:where||"1=1"})});
+  if(!r.ok)throw new Error("generateRenderer HTTP "+r.status);
+  const j=await r.json();if(j&&j.error)throw new Error(`ArcGIS error ${j.error.code}: ${j.error.message}`);
+  const infos=j&&j.renderer&&j.renderer.classBreakInfos;if(!infos||!infos.length)throw new Error("classBreakInfos missing");
+  const br=[],cols=[];for(let i=0;i<infos.length;i++){br.push(infos[i].classMaxValue);const c=(infos[i].symbol&&infos[i].symbol.color)||[200,200,200,255];cols.push(`rgba(${c[0]},${c[1]},${c[2]},${(c[3]||255)/255})`);}
+  return {breaks:br.slice(0,k-1),colors:cols};
+}
+
+/* ===== Pipeline ===== */
+function pickAvailableField(preferred){
+  const candidates=[preferred,"RPL_THEMES","RPL_THEME1","RPL_THEME2","RPL_THEME3","RPL_THEME4",
+    "EP_POV150","EP_UNEMP","EP_HBURD","EP_NOHSDP","EP_UNINSUR",
+    "EP_AGE65","EP_AGE17","EP_DISABL","EP_SNGPNT","EP_LIMENG",
+    "EP_MINRTY","EP_MUNIT","EP_MOBILE","EP_CROWD","EP_NOVEH","EP_GROUPQ","E_TOTPOP","E_HU","E_HH"];
+  for(const nm of candidates){if(resolvedFields.has(nm))return nm;}
+  return preferred;
+}
+function expandEnvelope(env,f){const cx=(env.xmin+env.xmax)/2,cy=(env.ymin+env.ymax)/2;const w=(env.xmax-env.xmin)*f,h=(env.ymax-env.ymin)*f;return {xmin:cx-w/2,ymin:cy-h/2,xmax:cx+w/2,ymax:cy+h/2};}
+function currentEnvelope(){const xC=lon2x(center.lon,zoom),yC=lat2y(center.lat,zoom);const xmin=xC-W/2,ymin=yC-H/2,xmax=xC+W/2,ymax=yC+H/2;return {xmin:x2lon(xmin,zoom),ymin:y2lat(ymax,zoom),xmax:x2lon(xmax,zoom),ymax:y2lat(ymin,zoom)};}
+
+/* ===== Identify: Hit Test ===== */
+function pointInRing(lon,lat,ring){let inside=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];const intersect=((yi>lat)!==(yj>lat))&&(lon<(xj-xi)*(lat-yi)/(yj-yi+1e-12)+xi);if(intersect)inside=!inside;}return inside;}
+function pointInPolygon(lon,lat,poly){const outer=poly[0];if(!pointInRing(lon,lat,outer))return false;for(let r=1;r<poly.length;r++){if(pointInRing(lon,lat,poly[r]))return false;}return true;}
+function findFeatureAt(lon,lat){for(let i=0;i<features.length;i++){const g=features[i].geometry;if(g.type==='Polygon'){if(pointInPolygon(lon,lat,g.coordinates))return features[i];}else if(g.type==='MultiPolygon'){for(const part of g.coordinates){if(pointInPolygon(lon,lat,part))return features[i];}}}return null;}
+
+/* ===== Identify: Render ===== */
+function renderIdentify(feature, lon, lat){
+  idXY.textContent=`${Math.abs(lat).toFixed(5)}°${ lat>=0?'N':'S' }, ${Math.abs(lon).toFixed(5)}°${lon>=0?'E':'W'}`;
+  if(!feature){
+    idTitle.textContent='No feature at this location';
+    idKV.innerHTML=`<div class="id-no-feature">Click on a census tract to view its attributes.</div>`;
+    idPanel.style.display='flex'; return;
+  }
+  const props=feature.properties||{};
+  const county=props.COUNTY||props.CNTY||'';
+  const geoid=props.GEOID||props.FIPS||props.TRACT||'';
+  const tractNum=props.TRACT||geoid;
+  idTitle.textContent=county ? `Census Tract — ${county} County, TN` : `Census Tract ${tractNum}`;
+  currentProps=props;
+  renderKV(props);
+  idPanel.style.display='flex';
+}
+
+function renderKV(props){
+  const q=(idSearch.value||'').trim().toLowerCase();
+  const tokens=q.split(/\s+/).filter(Boolean);
+
+  function matchesSearch(key){
+    if(!tokens.length) return true;
+    const label=getFieldLabel(key).toLowerCase();
+    const hay=label+' '+key.toLowerCase();
+    return tokens.every(t=>hay.includes(t));
+  }
+
+  const allKeys=Object.keys(props);
+  const tbl=document.createElement('table');
+  tbl.className='id-tbl';
+
+  let anyRows=false;
+  const placed=new Set();
+
+  for(const group of FIELD_GROUPS){
+    const groupKeys=group.keys
+      .map(gk=>allKeys.find(k=>k.toUpperCase()===gk))
+      .filter(k=>k!==undefined && matchesSearch(k));
+    if(!groupKeys.length) continue;
+    anyRows=true;
+    const hdrRow=tbl.insertRow();
+    hdrRow.className='grp-hdr';
+    const hdrCell=hdrRow.insertCell();
+    hdrCell.colSpan=2;
+    hdrCell.textContent=group.label;
+    for(const k of groupKeys){
+      placed.add(k.toUpperCase());
+      appendRow(tbl, k, props);
+    }
+  }
+
+  // Any remaining fields not covered by groups
+  const rest=allKeys.filter(k=>!placed.has(k.toUpperCase()) && matchesSearch(k));
+  if(rest.length){
+    anyRows=true;
+    const hdrRow=tbl.insertRow();
+    hdrRow.className='grp-hdr';
+    const hdrCell=hdrRow.insertCell();
+    hdrCell.colSpan=2; hdrCell.textContent='Other Fields';
+    for(const k of rest) appendRow(tbl, k, props);
+  }
+
+  idKV.innerHTML='';
+  if(!anyRows){
+    idKV.innerHTML=`<div class="id-no-feature">No attributes match your search.</div>`;
+  } else {
+    idKV.appendChild(tbl);
+  }
+}
+
+function appendRow(tbl, key, props){
+  const row=tbl.insertRow();
+  row.className='data-row';
+  const val=props[key];
+  const label=getFieldLabel(key);
+  const ld=row.insertCell(); ld.className='lbl'; ld.textContent=label; ld.title=key;
+  const vd=row.insertCell(); vd.className='val';
+  if(val===null||val===undefined||val===''){
+    vd.textContent='—'; vd.classList.add('empty');
+  } else {
+    vd.textContent=String(val);
+  }
+}
+
+/* ===== Export ===== */
+function csvEscape(s){if(s===null||s===undefined)return"";const v=String(s);if(/[",\n]/.test(v))return`"${v.replace(/"/g,'""')}"`;return v;}
+
+btnCsvAll.onclick=()=>{
+  if(!currentProps) return;
+  const keys=Object.keys(currentProps);
+  const header=keys.map(k=>csvEscape(getFieldLabel(k))).join(",");
+  const row=keys.map(k=>csvEscape(currentProps[k])).join(",");
+  const csv=header+"\n"+row;
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='census_tract.csv';document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},0);
+};
+
+btnCopyJson.onclick=async()=>{
+  if(!currentProps) return;
+  // Build a readable JSON with descriptions as keys
+  const readable={};
+  for(const k of Object.keys(currentProps)) readable[getFieldLabel(k)]=currentProps[k];
+  try{
+    await navigator.clipboard.writeText(JSON.stringify(readable,null,2));
+    btnCopyJson.textContent='Copied!'; setTimeout(()=>btnCopyJson.textContent='JSON',1500);
+  }catch(_){alert('Clipboard not available');}
+};
+
+btnGeoJSON.onclick=()=>{
+  if(!selectedFeature) return;
+  const gj={type:"FeatureCollection",features:[selectedFeature]};
+  const name=(currentProps&&(currentProps.GEOID||currentProps.TRACT||currentProps.FIPS))||'feature';
+  const blob=new Blob([JSON.stringify(gj)],{type:'application/geo+json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`${name}.geojson`;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},0);
+};
+
+/* ===== Presentation Settings ===== */
+function applyPresentationSettings(){
+  if(breaks&&breaks.length){
+    if(classMode==='server'){if(paletteOverride){colors=sampleColors(paletteName,breaks.length+1,paletteReverse);}}
+    else{colors=sampleColors(paletteName,breaks.length+1,paletteReverse);}
+    drawLegend(); draw();
+  }
+}
+
+/* ===== Top Menu Bindings ===== */
+function bindTopMenuEvents(){
+  applyBtn.onclick=refresh;
+  dataSel.onchange=()=>{dataMode=dataSel.value;syncPills();refresh();};
+  yearSel.onchange=()=>{refresh();};
+  fieldSel.onchange=()=>{field=fieldSel.value;clientClassify();draw();};
+  autoSel.onchange=()=>{classMode=autoSel.value;syncPills();classifyAndRedraw(true);};
+  methodSel.onchange=()=>{method=methodSel.value;classifyAndRedraw(true);};
+  classSel.onchange=()=>{k=parseInt(classSel.value,10);classifyAndRedraw(true);};
+  basemapChk.onchange=()=>draw();
+  const onEnterApply=(e)=>{if(e.key==='Enter'){e.preventDefault();refresh();}};
+  stateInput.addEventListener('keydown',onEnterApply);
+  countyInput.addEventListener('keydown',onEnterApply);
+  paletteSel.onchange=()=>{paletteName=paletteSel.value;applyPresentationSettings();}
+  reverseChk.onchange=()=>{paletteReverse=reverseChk.checked;applyPresentationSettings();}
+  overrideChk.onchange=()=>{paletteOverride=overrideChk.checked;applyPresentationSettings();}
+  opRange.oninput=()=>{layerOpacity=parseFloat(opRange.value);opVal.textContent=layerOpacity.toFixed(2);drawLegend();draw();}
+}
+
+/* ===== Classification / Refresh ===== */
+function classifyAndRedraw(forceServer=false){
+  if(classMode==='server'&&dataMode==='live'&&forceServer){refresh();}
+  else{clientClassify();draw();}
+}
+async function refresh(){
+  hideBanner();setStatus("Loading…");log("refresh() start:",new Date().toLocaleTimeString());
+  try{
+    if(dataMode==='live'){
+      const url=await layerUrlByYear();log(`query layer: ${url}`);
+      const reqField=field;field=pickAvailableField(reqField);
+      if(field!==reqField){log(`⚠ Requested field ${reqField} → ${field}`);fieldSel.value=field;}
+      let where=buildWhereWithFields();log(`where: ${where}`);
+      let env=currentEnvelope();
+      let list=await queryFeaturesGeoJSON(url,where,env,["*"],5000);
+      if(!list.length){log("0 results → expanding viewport 4x");env=expandEnvelope(env,4);list=await queryFeaturesGeoJSON(url,where,env,["*"],5000);}
+      if(!list.length){log("0 results → retrying worldwide");list=await queryFeaturesGeoJSON(url,where,WORLD_ENV,["*"],5000);}
+      if(!list.length)throw new Error("All 3 queries returned 0 results — try widening the filter or viewport");
+      features=list;pillData.textContent="Data: Live";
+      if(classMode==='server'){
+        try{const rr=await serverRenderer(url,field,method,k,where);breaks=rr.breaks;colors=rr.colors;if(paletteOverride){colors=sampleColors(paletteName,breaks.length+1,paletteReverse);}pillClass.textContent="Classification: Server";}
+        catch(e){showBanner("`/generateRenderer` failed → falling back to Client: "+(e&&e.message?e.message:e));classMode='client';autoSel.value='client';clientClassify();pillClass.textContent="Classification: Client";}
+      }else{clientClassify();pillClass.textContent="Classification: Client";}
+    }else{
+      features=OFFLINE.features;pillData.textContent="Data: Offline";classMode='client';autoSel.value='client';clientClassify();pillClass.textContent='Classification: Client';
+    }
+    draw();setStatus(`${features.length} census tracts loaded — click any tract to inspect attributes`);
+  }catch(e){
+    const fb=document.getElementById('autoFallback').checked;
+    log("refresh() error:",e.message||e);
+    if(fb){
+      showBanner("Error — switched to Offline Demo: "+(e&&e.message?e.message:e));
+      features=OFFLINE.features;dataMode='offline';dataSel.value='offline';classMode='client';autoSel.value='client';clientClassify();draw();
+      setStatus(`Offline demo — click any tract to inspect attributes`);
+    }else{
+      showBanner("Error (fallback disabled): "+(e&&e.message?e.message:e)+" — keeping Live");draw();setStatus("Live mode (error occurred)");
+    }
+  }
+}
+
+/* ===== Initialization ===== */
+function init(){
+  dataSel.value='live';autoSel.value='client';fieldSel.value=field;methodSel.value=method;classSel.value=String(k);
+  paletteSel.value=paletteName;reverseChk.checked=paletteReverse;overrideChk.checked=paletteOverride;
+  opRange.value=layerOpacity;opVal.textContent=layerOpacity.toFixed(2);
+  bindTopMenuEvents();resize();refresh();
+}
+window.addEventListener('load',init);
+</script>
+</body>
+</html>
